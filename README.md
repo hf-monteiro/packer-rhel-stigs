@@ -1,0 +1,1 @@
+# packer-rhel-stigs
