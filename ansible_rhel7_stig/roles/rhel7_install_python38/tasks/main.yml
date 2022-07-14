@@ -1,0 +1,57 @@
+---
+- name: upgrade all packages
+  yum: 
+    name: "*" 
+    state: latest
+- name: Install dependencies for ansible 3.8
+  yum:
+    name: "{{item}}"
+    state: latest
+  with_items:
+    - "gcc"
+    - "openssl-devel"
+    - "bzip2-devel"
+    - "libffi-devel"
+    - "zlib-devel"
+    - "wget"
+    - "libsemanage-python"
+- name: Copy python3.8
+  copy:
+    src: ../files/Python-3.8.12.tgz
+    dest: "{{ working_directory }}"
+    owner: root
+    group: root
+    mode: '0777'
+- name: Unarchive python
+  unarchive:
+    src: "{{ working_directory }}/Python-3.8.12.tgz"
+    dest: "{{ working_directory }}"
+    remote_src: yes
+- name: Remove ansible file
+  ansible.builtin.file:
+    path: "{{ working_directory }}/Python-3.8.12.tgz"
+    state: absent
+- name: Configure to compile
+  shell: ./configure --enable-optimizations
+  args:
+    chdir: "{{ working_directory }}/Python-3.8.12/"
+- name: Make install
+  shell: make install
+  args:
+    chdir: "{{ working_directory }}/Python-3.8.12/"
+- name: Remove old python3
+  file:
+    path: /bin/python3
+    state: absent
+- name: Copy new python
+  copy: 
+    remote_src: True
+    src: "{{ working_directory }}/Python-3.8.12/python"
+    dest: /bin/python3
+    owner: root
+    group: root
+    mode: "0755"
+- name: Remove python folder
+  file:
+    path: "{{ working_directory }}/Python-3.8.12"
+    state: absent

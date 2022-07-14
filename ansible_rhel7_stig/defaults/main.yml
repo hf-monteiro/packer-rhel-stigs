@@ -1,0 +1,6 @@
+---
+working_directory: /home/ec2-user
+sebool_ssh_sysadm_login: false
+users_list:
+    - { state: present,   name: root,       password: "@AnyPassword@",  update_password: "always",  uid: "0",     create_home: true,  home: "/root" }
+    - { state: present,   name: ec2-user,   password: "@AnyPassword@",  update_password: "always",  uid: "1000",  create_home: true,  home: "/home/ec2-user" }

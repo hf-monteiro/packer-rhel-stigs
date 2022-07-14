@@ -1,0 +1,9 @@
+- hosts: local
+  become: true
+  gather_facts: true
+  vars_files:
+    - defaults/main.yml
+  roles:
+    - rhel7_users_list
+    - rhel7_stig
+    - rhel7_users_unlock

@@ -1,0 +1,25 @@
+---
+- name: Copy get-pip.py script
+  copy:
+    src: ../files/get-pip.py
+    dest: "{{ working_directory }}"
+    owner: ec2-user
+    group: ec2-user
+    mode: '0777'
+- name: Install pip
+  shell: python3 get-pip.py
+  args:
+    chdir: "{{ working_directory }}"
+- name: Delete get-pip.py
+  file:
+    path: "{{ working_directory }}/get-pip.py"
+    state: absent
+- name: Install ansible
+  shell: python3 -m pip install ansible
+- name: Makes ansible available for all users 
+  file:
+    src: /usr/local/bin/ansible
+    dest: /bin/ansible
+    state: link
+- name: Install ansible dependecies
+  shell: python3 -m pip install selinux
