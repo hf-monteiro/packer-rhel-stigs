@@ -1,0 +1,10 @@
+---
+- name: Unlock users list to loggin
+  command: passwd -u "{{item.name}}"
+  with_items: "{{ users_list }}"
+  when: users_list | length > 0
+  tags: 
+    - high_severity
+    - medium_severity
+    - low_severity
+

@@ -1,0 +1,8 @@
+- hosts: all
+  become: true
+  gather_facts: true
+  vars_files:
+    - defaults/main.yml
+  roles:
+    - rhel7_install_python38
+    - rhel7_install_ansible
