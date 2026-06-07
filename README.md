@@ -1,78 +1,85 @@
-Red Hat Enterprise Linux 7 DISA STIG image creation with Packer
-=========
-This project uses [Packer](https://www.packer.io/)+[Ansible](https://www.ansible.com/) to build an DISA STIG compliant RHEL7 image on AWS.
+# RHEL 7 DISA STIG Image Hardening (Packer)
 
-Requirements
-------------
-- Red Hat Enterprise Linux 7 (Other versions are not supported.)
-- AWS CLI - [install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- AWS IAM programmatically credentials
-- Packer installed - [install Packer](https://learn.hashicorp.com/tutorials/packer/get-started-install-cli)
-- Ansible installed - [install Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)
+Packer and Ansible pipeline for building a DISA STIG-compliant Red Hat Enterprise Linux 7 AMI on AWS. Applies CAT I, II, and III security controls via Ansible roles.
 
-Packer variables file
-----------------
-All the adjustments/definitions are made on the `variables.pkr.hcl` file.
+## Architecture
 
+```mermaid
+flowchart LR
+    SRC["Source\nRHEL 7 AMI\n(AWS Marketplace)"]
 
-Dependencies
-------------
+    subgraph Packer Build
+        EC2["Temporary EC2\nInstance"]
 
-The following packages must be installed on the controlling host/host where ansible is executed:
+        subgraph Ansible Provisioners
+            PY["Install Python 3.8\n+ Ansible"]
+            CAT3["Apply CAT III\n(low severity STIGs)"]
+            CAT2["Apply CAT II\n(medium severity STIGs)"]
+            CAT1["Apply CAT I\n(high severity STIGs)"]
+        end
+    end
 
-- gcc
-- openssl-devel
-- bzip2-devel
-- libffi-devel
-- zlib-devel
-- wget
-- libsemanage-python
+    AMI["Hardened AMI\nSTIG-compliant RHEL 7"]
 
-Role Variables
---------------
-
-Please see the Ansible docs for understanding [variable precedence](https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html#variable-precedence-where-should-i-put-a-variable) to tailor for your needs. 
-
-| Tag                     | Default Value       | Description                   |
-|--------------------------|-----------------------------------------------------|----------------------|
-| `high_severity` | `yes`  see defaults/main.yml](./defaults/main.yml)  | Correct CAT I findings        |
-| `medium_severity` | `yes`  see defaults/main.yml](./defaults/main.yml)  | Correct CAT II findings       |
-| `low_severity` | `yes`  see defaults/main.yml](./defaults/main.yml)  | Correct CAT III findings      |
-
-
-## Testing
-```shell
-ansible-playbook -i inventory --tags "low_severity" --skip-tags "sudo_remove_nopasswd" playbook.yml
+    SRC --> EC2
+    EC2 --> PY --> CAT3 --> CAT2 --> CAT1
+    CAT1 --> AMI
 ```
 
-### Image builder
-Configure the file `playbook.yml` to run locally 
+## Repository Structure
+
 ```
-    host: localhost
+├── packer/
+│   ├── sources.pkr.hcl        # Source AMI definition (amazon-ebs)
+│   ├── builder.pkr.hcl        # Build block + provisioner sequence
+│   └── variables.pkr.hcl      # Packer input variables
+└── ansible_rhel7_stig/
+    ├── install_ansible.yml    # Installs Python 3.8 + Ansible on the instance
+    ├── apply_stigs.yml        # Main STIG playbook (tagged by severity)
+    ├── inventory              # Localhost inventory
+    └── roles/
+        ├── rhel7_stig/        # Main STIG role (CAT I/II/III controls)
+        ├── rhel7_install_ansible/  # Ansible bootstrap role
+        ├── rhel7_install_python38/ # Python 3.8 install role
+        ├── rhel7_users_list/       # User enumeration
+        └── rhel7_users_unlock/     # User unlock controls
 ```
 
-Running the ansible-playbook locally:
-```shell
-ansible-playbook -i "localhost," -c local --tags "low_severity" --skip-tags "sudo_remove_nopasswd" playbook.yml
-ansible-playbook -i "localhost," -c local --tags "medium_severity" --skip-tags "sudo_remove_nopasswd" playbook.yml
-ansible-playbook -i "localhost," -c local --tags "high_severity" --skip-tags "sudo_remove_nopasswd" playbook.yml
+## STIG Severity Tags
+
+| Tag | Severity | Description |
+|-----|----------|-------------|
+| `high_severity` | CAT I | Critical findings — must fix |
+| `medium_severity` | CAT II | Significant findings — should fix |
+| `low_severity` | CAT III | Low-risk findings — good to fix |
+
+## Prerequisites
+
+- Red Hat Enterprise Linux 7 (other versions not supported)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) configured with IAM credentials
+- [Packer](https://learn.hashicorp.com/tutorials/packer/get-started-install-cli) installed
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) installed
+
+Controller host dependencies:
 ```
-Packer usage
-----------------
-1. With your IAM programmatically credentials, login to  AWS CLI running:
+gcc, openssl-devel, bzip2-devel, libffi-devel, zlib-devel, wget, libsemanage-python
+```
+
+## Usage
+
 ```shell
 aws configure
+
+cd packer
+packer init .
+packer validate .
+packer build .
 ```
 
-2. Run the following command on the `packer` folder, to initialize the modules 
+To test Ansible playbooks independently:
 ```shell
-packer init .
-```
-3. Run the following command to validate all the infrastructure that Packer will deploy on AWS:
-```shell
-packer validate . 
-```
- 4. Run the following command to deploy the EC2 on AWS, to build the image:
-```shell
-packer build . 
+ansible-playbook -i inventory -c local \
+  --tags "low_severity" \
+  --skip-tags "sudo_remove_nopasswd" \
+  ansible_rhel7_stig/apply_stigs.yml
 ```
